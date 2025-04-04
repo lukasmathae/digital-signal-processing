@@ -38,4 +38,12 @@ server and a database to display the data even better.
 
 - Getting raspberry, webcam and maybe scale?
 
-- Finding opencv libs
+- Finding opencv libs (https://www.geeksforgeeks.org/text-detection-and-extraction-using-opencv-and-ocr/)
+  - Languages:  https://pypi.org/project/pytesseract/
+- own model usage via opencv (https://docs.opencv.org/4.x/d9/d1e/tutorial_dnn_OCR.html)
+
+
+## Installation
+
+    pip install -r requirements.txt
+    sudo apt-get install tesseract-ocr

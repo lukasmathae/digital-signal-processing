@@ -1,2 +1,9 @@
 #IDE
 .idea
+
+#Python
+.venv
+
+#Test data
+test_v2
+test_v2.zip
