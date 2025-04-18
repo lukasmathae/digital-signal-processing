@@ -22,3 +22,11 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+
+#Data
+dataset
+results/*.txt
+results/pictures/*.jpg
+
+#venv
+.venv
