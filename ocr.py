@@ -3,6 +3,8 @@ import easyocr
 import time
 import os
 import re
+import numpy as np
+
 
 found_amk = 0
 
@@ -33,13 +35,33 @@ def find_amk_codes(text_lines):
         matches.extend(found)
 
     return matches
-
+"""
+#We dont use prepocessing bc the results are worse...
 def preprocess_image(image):
+    # Convert to grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (3, 3), 0)
-    _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    return thresh
 
+    # Apply Gaussian blur
+    blur = cv2.GaussianBlur(gray, (3, 3), 0)
+
+
+    # Adaptive thresholding
+    thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+
+    #denoised = cv2.medianBlur(gray, 7)  # Try 3, 5, or 7
+
+    # Denoise the image
+    denoised = cv2.fastNlMeansDenoising(thresh, h=30)
+    #denoised = gray
+    # Sharpen the image
+    kernel = np.array([[0, -1, 0],
+                       [-1, 5, -1],
+                       [0, -1, 0]])
+    sharpened = cv2.filter2D(denoised, -1, kernel)
+
+    return sharpened
+
+"""
 
 def perform_ocr(reader, image_path, roi=None):
     image = cv2.imread(image_path)
@@ -129,7 +151,7 @@ def perform_ocr_with_rotation(reader, image_path, roi=None):
 
     rotations = {
         180: cv2.rotate(image, cv2.ROTATE_180),
-        0: image,
+        #0: image,
         90: cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE),
         270: cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
     }
@@ -186,8 +208,8 @@ def main():
     roi = (500, 0, 2500, 2500)
 
     for image_path in image_files:
-        texts, annotated_image = perform_ocr(reader, image_path, roi)
-        #texts, annotated_image = perform_ocr_with_rotation(reader, image_path, roi)
+        #texts, annotated_image = perform_ocr(reader, image_path, roi)
+        texts, annotated_image = perform_ocr_with_rotation(reader, image_path, roi)
 
         if texts is not None and annotated_image is not None:
             save_ocr_results(image_path, texts, annotated_image, results_dir)
