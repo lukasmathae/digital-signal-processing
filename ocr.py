@@ -5,11 +5,11 @@ import os
 import re
 
 
-def initialize_ocr(languages=None):
+def initialize_ocr(languages=None, gpu=False):
     """Initializes the EasyOCR reader with given languages."""
     if languages is None:
         languages = ['en']
-    return easyocr.Reader(languages)
+    return easyocr.Reader(languages, gpu=gpu)
 
 def find_amk_codes(text_lines):
     """
@@ -27,6 +27,12 @@ def find_amk_codes(text_lines):
 
     return matches
 
+def preprocess_image(image):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (3, 3), 0)
+    _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    return thresh
+
 
 def perform_ocr(reader, image_path, roi=None):
     image = cv2.imread(image_path)
@@ -43,9 +49,14 @@ def perform_ocr(reader, image_path, roi=None):
     else:
         roi_image = image.copy()
 
-    gray = cv2.cvtColor(roi_image, cv2.COLOR_BGR2GRAY)
+    scale_factor = 2.0
+    roi_image = cv2.resize(roi_image, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_LINEAR)
+
+    #preprocssed = cv2.cvtColor(roi_image, cv2.COLOR_BGR2GRAY)
+    #preprocssed = preprocess_image(roi_image)
+    preprocssed = roi_image
     start_time = time.time()
-    results = reader.readtext(gray)
+    results = reader.readtext(preprocssed)
     end_time = time.time()
 
     print(f"OCR on {os.path.basename(image_path)} completed in {end_time - start_time:.2f} seconds")
@@ -120,9 +131,14 @@ def perform_ocr_with_rotation(reader, image_path, roi=None):
         else:
             roi_image = rotated_img.copy()
 
-        gray = cv2.cvtColor(roi_image, cv2.COLOR_BGR2GRAY)
+        scale_factor = 2.0
+        roi_image = cv2.resize(roi_image, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_LINEAR)
+
+        # preprocssed = cv2.cvtColor(roi_image, cv2.COLOR_BGR2GRAY)
+        # preprocssed = preprocess_image(roi_image)
+        preprocssed = roi_image
         start_time = time.time()
-        results = reader.readtext(gray)
+        results = reader.readtext(preprocssed)
         end_time = time.time()
 
         extracted_texts = [text for (_, text, _) in results]
@@ -154,14 +170,14 @@ def main():
         print("No images found in the dataset directory.")
         return
 
-    reader = initialize_ocr(['en', 'ko'])
+    reader = initialize_ocr(['en', 'ko'], True)
 
     # Define the region of interest: (x, y, width, height)
     roi = (500, 0, 2500, 2500)
 
     for image_path in image_files:
-        #texts, annotated_image = perform_ocr(reader, image_path, roi)
-        texts, annotated_image = perform_ocr_with_rotation(reader, image_path, roi)
+        texts, annotated_image = perform_ocr(reader, image_path, roi)
+        #texts, annotated_image = perform_ocr_with_rotation(reader, image_path, roi)
 
         if texts is not None and annotated_image is not None:
             save_ocr_results(image_path, texts, annotated_image, results_dir)
