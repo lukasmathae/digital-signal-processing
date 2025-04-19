@@ -4,6 +4,8 @@ import time
 import os
 import re
 
+found_amk = 0
+
 
 def initialize_ocr(languages=None, gpu=False):
     """Initializes the EasyOCR reader with given languages."""
@@ -18,11 +20,16 @@ def find_amk_codes(text_lines):
     """
     #pattern = r'AMK[-\s]?\d+'
 
-    pattern = r'\b[Aa]?[Mm][Kk][- ]?\d{5}\b'
+    #pattern = r'\b[Aa]?[Mm][Kk][- ]?\d{5}\b'
+    #pattern = r'\b([A-Z]?[Mm]?[Kk]?)+\d{4,6}\b'
+    #pretty good
+    #pattern = r'\b(?=[A-Z]*[AMK])[A-Z]{1,4}[- ]?\d{5}\b'
+    pattern = r'[^A-Z0-9]?([AMK]{1,3}[- ]?\d{5})[^A-Z0-9]?'
+
     matches = []
 
     for line in text_lines:
-        found = re.findall(pattern, line)
+        found = re.findall(pattern, line, flags=re.IGNORECASE)
         matches.extend(found)
 
     return matches
@@ -76,6 +83,7 @@ def perform_ocr(reader, image_path, roi=None):
 def save_ocr_results(image_path, texts, annotated_image, output_dir="results"):
     """Saves OCR text and annotated image to the results directory."""
     os.makedirs(output_dir, exist_ok=True)
+    global found_amk
     pictures_dir = os.path.join(output_dir, "pictures")
     os.makedirs(pictures_dir, exist_ok=True)
 
@@ -93,8 +101,10 @@ def save_ocr_results(image_path, texts, annotated_image, output_dir="results"):
         if amk_matches:
             print(f"=================================(Found {len(amk_matches)} amk+number patterns)=======================")
             f.write("\n--- amk Matches ---\n")
+            found_amk += 1
             for match in amk_matches:
                 f.write(match + "\n")
+                print(match)
 
     print(f"Saved OCR text to: {text_output_path}")
 
@@ -181,6 +191,8 @@ def main():
 
         if texts is not None and annotated_image is not None:
             save_ocr_results(image_path, texts, annotated_image, results_dir)
+
+    print("Done. Found " + str(found_amk) + " amk+number patterns.")
 
 
 if __name__ == "__main__":
