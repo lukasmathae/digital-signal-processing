@@ -192,6 +192,39 @@ def perform_ocr_with_rotation(reader, image_path, roi=None):
     return None, None
 
 
+def debug_template_match(full_image_path, template_image_path, roi=None, debug_output_path='debug_output.jpg'):
+    # Load the full image and the template
+    x, y, w, h = roi
+    full_image_color = cv2.imread(full_image_path)
+    full_image_color = cv2.rotate(full_image_color, cv2.ROTATE_180)
+    full_image_gray = cv2.cvtColor(full_image_color, cv2.COLOR_BGR2GRAY)
+    roi_image = full_image_gray[y:y + h, x:x + w].copy()
+    template_gray = cv2.imread(template_image_path, cv2.IMREAD_GRAYSCALE)
+
+    # Perform template matching
+    res = cv2.matchTemplate(full_image_gray, template_gray, cv2.TM_CCOEFF_NORMED)
+    _, max_val, _, max_loc = cv2.minMaxLoc(res)
+
+    # Define the bounding box of the matched region
+    h, w = template_gray.shape
+    top_left = max_loc
+    bottom_right = (top_left[0] + w, top_left[1] + h)
+
+    # Draw rectangle for visualization
+    cv2.rectangle(full_image_color, top_left, bottom_right, (0, 255, 0), 2)
+
+    # Extract and show/save ROI
+    display_region = full_image_color[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
+
+    # Optional: save the debug result
+    #cv2.imwrite(debug_output_path, full_image_color)
+    #cv2.imshow("Matched Template Region", full_image_color)
+    cv2.imshow("Extracted ROI", display_region)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    return display_region, top_left, bottom_right, max_val
+
 
 def main():
     dataset_dir = "dataset"
@@ -216,6 +249,39 @@ def main():
 
     print("Done. Found " + str(found_amk) + " amk+number patterns.")
 
+'''
+### function
 
+def match_template(image_path, top_left, bottom_right, roi, debug=True):
+    # Load the image
+    image = cv2.imread(image_path)
+    image = cv2.rotate(image, cv2.ROTATE_180)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    gray = gray[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
+
+
+   ### main
+dataset_dir = "/home/lukas/abroad/courses/digitalSignalProcessing/digital-signal-processing/dataset"
+    scale_template_path = "scale_display.png"
+    image_files = get_image_files_from_directory(dataset_dir)
+
+    if not image_files:
+        print("No images found in the dataset directory.")
+        return
+
+    load_templates()
+    roi = (1500, 350, 1000, 500)
+    for image_path in image_files:
+        # Use the debug_template_match to find the scale region (display area)
+        display_region, top_left, bottom_right, max_val = debug_template_match(image_path, scale_template_path, roi)
+
+        # Now, use the extracted region (top_left, bottom_right) for template matching
+        roi = (top_left[0], top_left[1], bottom_right[0] - top_left[0], bottom_right[1] - top_left[1])
+        print(roi)
+        # Call match_template using the region found by debug_template_match
+        match_template(image_path,  top_left, bottom_right, roi, debug=True)
+
+'''
 if __name__ == "__main__":
     main()
