@@ -4,6 +4,11 @@ import time
 import os
 import re
 import numpy as np
+from pyzbar import pyzbar
+
+DEBUG = True  # Set to True to save images with barcode bounding boxes
+DEBUG_FOLDER = "debug_results_barcode"
+
 
 
 found_amk = 0
@@ -226,6 +231,66 @@ def debug_template_match(full_image_path, template_image_path, roi=None, debug_o
     return display_region, top_left, bottom_right, max_val
 
 
+def rotate_image(image, angle):
+    """Rotate image to given angle."""
+    (h, w) = image.shape[:2]
+    center = (w // 2, h // 2)
+
+    matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+    rotated = cv2.warpAffine(image, matrix, (w, h))
+
+    return rotated
+
+
+def decode_barcodes(image):
+    """Try to decode barcodes in image using pyzbar."""
+    barcodes = pyzbar.decode(image)
+    results = []
+    for barcode in barcodes:
+        barcode_data = barcode.data.decode("utf-8")
+        barcode_type = barcode.type
+        rect = barcode.rect  # x, y, w, h
+        results.append((barcode_data, barcode_type, rect))
+    return results
+
+
+def draw_barcodes(image, barcodes):
+    """Draw rectangles and data around detected barcodes."""
+    for data, btype, rect in barcodes:
+        x, y, w, h = rect
+        cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        cv2.putText(image, f'{btype}: {data}', (x, y - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+    return image
+
+
+def process_image_barcode(file_path):
+    """Process one image and try multiple rotations for barcode detection."""
+    image = cv2.imread(file_path)
+    if image is None:
+        print(f"[!] Failed to load image: {file_path}")
+        return []
+
+    for angle in [180, 90, 0, 270]:
+        rotated = rotate_image(image, angle)
+        barcodes = decode_barcodes(rotated)
+        if barcodes:
+            print(f"[✓] Found in {os.path.basename(file_path)} (rotation: {angle}°)")
+
+            if DEBUG:
+                debug_image = draw_barcodes(rotated.copy(), barcodes)
+                if not os.path.exists(DEBUG_FOLDER):
+                    os.makedirs(DEBUG_FOLDER)
+                debug_filename = os.path.join(DEBUG_FOLDER, f"debug_{angle}_{os.path.basename(file_path)}")
+                cv2.imwrite(debug_filename, debug_image)
+                print(f"    Saved debug image: {debug_filename}")
+
+            return barcodes
+
+    print(f"[x] No barcode found in {os.path.basename(file_path)}")
+    return []
+
+
 def main():
     dataset_dir = "dataset"
     results_dir = "results"
@@ -243,45 +308,44 @@ def main():
     for image_path in image_files:
         #texts, annotated_image = perform_ocr(reader, image_path, roi)
         texts, annotated_image = perform_ocr_with_rotation(reader, image_path, roi)
+        found_barcode = process_image_barcode(image_path)
+        if found_barcode:
+            for data, btype, rect in found_barcode:
+                print(f"{image_path}: [{btype}] {data}")
+        else:
+            print(f"{image_path}: No barcode found.")
 
         if texts is not None and annotated_image is not None:
             save_ocr_results(image_path, texts, annotated_image, results_dir)
 
     print("Done. Found " + str(found_amk) + " amk+number patterns.")
 
-'''
-### function
 
-def match_template(image_path, top_left, bottom_right, roi, debug=True):
-    # Load the image
-    image = cv2.imread(image_path)
-    image = cv2.rotate(image, cv2.ROTATE_180)
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-    gray = gray[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
-
-
-   ### main
-dataset_dir = "/home/lukas/abroad/courses/digitalSignalProcessing/digital-signal-processing/dataset"
-    scale_template_path = "scale_display.png"
-    image_files = get_image_files_from_directory(dataset_dir)
-
-    if not image_files:
-        print("No images found in the dataset directory.")
-        return
-
-    load_templates()
-    roi = (1500, 350, 1000, 500)
-    for image_path in image_files:
-        # Use the debug_template_match to find the scale region (display area)
-        display_region, top_left, bottom_right, max_val = debug_template_match(image_path, scale_template_path, roi)
-
-        # Now, use the extracted region (top_left, bottom_right) for template matching
-        roi = (top_left[0], top_left[1], bottom_right[0] - top_left[0], bottom_right[1] - top_left[1])
-        print(roi)
-        # Call match_template using the region found by debug_template_match
-        match_template(image_path,  top_left, bottom_right, roi, debug=True)
-
-'''
 if __name__ == "__main__":
     main()
+
+
+
+'''
+def scan_folder(folder_path):
+    """Scan all images in a folder for barcodes."""
+    results = {}
+    for filename in os.listdir(folder_path):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
+            full_path = os.path.join(folder_path, filename)
+            barcodes = process_image(full_path)
+            results[filename] = barcodes
+    return results
+
+
+# ======= USAGE ========
+if __name__ == "__main__":
+    folder = "/home/lukas/abroad/courses/digitalSignalProcessing/digital-signal-processing/dataset"
+    result = scan_folder(folder)
+
+    print("\n=== Summary ===")
+    for fname, barcodes in result.items():
+
+
+'''
+
