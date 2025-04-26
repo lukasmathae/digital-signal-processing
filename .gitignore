@@ -27,6 +27,7 @@ var/
 dataset
 results/*.txt
 results/pictures/*.jpg
+debug_results_barcode
 
 #venv
 .venv

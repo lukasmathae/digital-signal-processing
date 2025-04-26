@@ -315,14 +315,19 @@ def main():
     roi = (500, 0, 2500, 2500)
     scale_roi = (1500,350, 1000, 500)
     for image_path in image_files:
-        #texts, annotated_image = perform_ocr(reader, image_path, roi)
-        texts, annotated_image = perform_ocr_with_rotation(reader, image_path, roi)
+
+        # Barcode
         found_barcode = process_image_barcode(image_path)
         if found_barcode:
             for data, btype, rect in found_barcode:
                 print(f"{image_path}: [{btype}] {data}")
         else:
             print(f"{image_path}: No barcode found.")
+
+        # Scale + AMK
+        #texts, annotated_image = perform_ocr(reader, image_path, roi)
+        texts, annotated_image = perform_ocr_with_rotation(reader, image_path, roi)
+
 
 
         if texts is not None and annotated_image is not None:
