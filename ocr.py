@@ -68,7 +68,7 @@ def preprocess_image(image):
 
 """
 
-def perform_ocr(reader, image_path, roi=None):
+def perform_ocr(reader, image_path, roi=None, top_left=None, bottom_right=None):
     image = cv2.imread(image_path)
     if image is None:
         print(f"Error: Could not read image {image_path}")
@@ -76,12 +76,20 @@ def perform_ocr(reader, image_path, roi=None):
 
     image = cv2.rotate(image, cv2.ROTATE_180)
 
+
     # Crop the region of interest if specified
-    if roi is not None:
+    if roi is not None and top_left is None and bottom_right is None:
         x, y, w, h = roi
         roi_image = image[y:y+h, x:x+w].copy()
     else:
         roi_image = image.copy()
+
+    if top_left is not None and bottom_right is not None:
+        image = cv2.imread(image_path)
+        image = cv2.rotate(image, cv2.ROTATE_180)
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        roi_image = gray[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
 
     scale_factor = 2.0
     roi_image = cv2.resize(roi_image, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_LINEAR)
@@ -224,9 +232,9 @@ def debug_template_match(full_image_path, template_image_path, roi=None, debug_o
     # Optional: save the debug result
     #cv2.imwrite(debug_output_path, full_image_color)
     #cv2.imshow("Matched Template Region", full_image_color)
-    cv2.imshow("Extracted ROI", display_region)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    #cv2.imshow("Extracted ROI", display_region)
+    #cv2.waitKey(0)
+    #cv2.destroyAllWindows()
 
     return display_region, top_left, bottom_right, max_val
 
@@ -294,6 +302,7 @@ def process_image_barcode(file_path):
 def main():
     dataset_dir = "dataset"
     results_dir = "results"
+    scale_template_path = "scale_display.png"
     image_files = get_image_files_from_directory(dataset_dir)
 
     if not image_files:
@@ -304,7 +313,7 @@ def main():
 
     # Define the region of interest: (x, y, width, height)
     roi = (500, 0, 2500, 2500)
-
+    scale_roi = (1500,350, 1000, 500)
     for image_path in image_files:
         #texts, annotated_image = perform_ocr(reader, image_path, roi)
         texts, annotated_image = perform_ocr_with_rotation(reader, image_path, roi)
@@ -315,6 +324,13 @@ def main():
         else:
             print(f"{image_path}: No barcode found.")
 
+
+        if texts is not None and annotated_image is not None:
+            save_ocr_results(image_path, texts, annotated_image, results_dir)
+
+        display_region, top_left, bottom_right, max_val = debug_template_match(image_path, scale_template_path, scale_roi)
+        perform_ocr(reader, image_path, None, top_left, bottom_right)
+        print("STARTING WEIGHTING --------------------------------")
         if texts is not None and annotated_image is not None:
             save_ocr_results(image_path, texts, annotated_image, results_dir)
 
