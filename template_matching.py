@@ -187,12 +187,12 @@ def compare_diplay_to_templates(scale_display_img_gray, matching_debug):
     return matched_digits, first, second, third
 
 
-def template_matching(dataset_dir, scale_template_path, digits_template_dir, roi, debug_scale_display=False, debug_template_matching=False):
+def template_matching(image, scale_template_path, digits_template_dir, roi, debug_scale_display=False, debug_template_matching=False):
     #dataset_dir = "/home/lukas/abroad/courses/digitalSignalProcessing/digital-signal-processing/dataset"
     #scale_template_path = "scale_display.png"
-    image_files = get_image_files_from_directory(dataset_dir)
+    #image_files = get_image_files_from_directory(dataset_dir)
 
-    if not image_files:
+    if not image:
         print("No images found in the dataset directory.")
         return
 
@@ -201,16 +201,29 @@ def template_matching(dataset_dir, scale_template_path, digits_template_dir, roi
     # Define the region of interest: (x, y, width, height)
     #roi = (500, 0, 2500, 2500)
     #roi = (1500, 350, 1000, 500)
-
+    '''
     for image_path in image_files:
         display_region, top_left, bottom_right, max_val = find_scale_display(image_path, scale_template_path, roi, debug_scale_display)
         matched_digits, first, second, third = compare_diplay_to_templates(display_region, debug_template_matching)
         print(f"==================================================")
-        global validation_counter
+        #global validation_counter
         print(f"Found for {image_path} following digits: {matched_digits}")
+        #print(
+        #    f"Weight: {first} . {second} {third} kg (should be counter({validation_counter}): {validation[validation_counter]})")
+        #validation_counter += 1
         print(
-            f"Weight: {first} . {second} {third} kg (should be counter({validation_counter}): {validation[validation_counter]})")
-        validation_counter += 1
+            f"Weight: {first} . {second} {third} kg)")
+    '''
 
+    display_region, top_left, bottom_right, max_val = find_scale_display(image, scale_template_path, roi,
+                                                                         debug_scale_display)
+    matched_digits, first, second, third = compare_diplay_to_templates(display_region, debug_template_matching)
+    # global validation_counter
+    print(f"Found for following digits: {matched_digits}")
+    # print(
+    #    f"Weight: {first} . {second} {third} kg (should be counter({validation_counter}): {validation[validation_counter]})")
+    # validation_counter += 1
+    print(
+        f"Weight: {first} . {second} {third} kg)")
 
     cv2.destroyAllWindows()

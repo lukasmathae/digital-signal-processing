@@ -3,12 +3,12 @@ import easyocr
 import time
 import os
 import re
-import numpy as np
 from pyzbar import pyzbar
+import template_matching
 
-DEBUG = True  # Set to True to save images with barcode bounding boxes
-DEBUG_FOLDER = "debug_results_barcode"
-
+DEBUG_BARCODE = False  # Set to True to save images with barcode bounding boxes
+DEBUG_BARCODE_FOLDER = "debug_results_barcode"
+RASPI = True
 
 
 found_amk = 0
@@ -284,13 +284,13 @@ def process_image_barcode(file_path):
         rotated = rotate_image(image, angle)
         barcodes = decode_barcodes(rotated)
         if barcodes:
-            print(f"[✓] Found in {os.path.basename(file_path)} (rotation: {angle}°)")
+            print(f"[✓] Found Barcode in {os.path.basename(file_path)} (rotation: {angle}°)")
 
-            if DEBUG:
+            if DEBUG_BARCODE:
                 debug_image = draw_barcodes(rotated.copy(), barcodes)
-                if not os.path.exists(DEBUG_FOLDER):
-                    os.makedirs(DEBUG_FOLDER)
-                debug_filename = os.path.join(DEBUG_FOLDER, f"debug_{angle}_{os.path.basename(file_path)}")
+                if not os.path.exists(DEBUG_BARCODE_FOLDER):
+                    os.makedirs(DEBUG_BARCODE_FOLDER)
+                debug_filename = os.path.join(DEBUG_BARCODE_FOLDER, f"debug_{angle}_{os.path.basename(file_path)}")
                 cv2.imwrite(debug_filename, debug_image)
                 print(f"    Saved debug image: {debug_filename}")
 
@@ -310,13 +310,14 @@ def main():
         print("No images found in the dataset directory.")
         return
 
-    reader = initialize_ocr(['en', 'ko'], True)
+
 
     # Define the region of interest: (x, y, width, height)
     roi = (500, 0, 2500, 2500)
-    scale_roi = (1500,350, 1000, 500)
+    scale_roi = (1500, 350, 1000, 500)
     for image_path in image_files:
-
+        print(f"===========================================================================================================")
+        print(f"[*] Processing image: {image_path}")
         # Barcode
         found_barcode = process_image_barcode(image_path)
         if found_barcode:
@@ -325,22 +326,27 @@ def main():
         else:
             print(f"{image_path}: No barcode found.")
 
-        # Scale + AMK
-        #texts, annotated_image = perform_ocr(reader, image_path, roi)
-        texts, annotated_image = perform_ocr_with_rotation(reader, image_path, roi)
+        # Scale and Template matching (Performance++)
+        template_matching.template_matching(image_path, scale_template_path, "scale_digit_templates", scale_roi, False, False)
+        if not RASPI:
+            # Scale + AMK
+            #texts, annotated_image = perform_ocr(reader, image_path, roi)
+            reader = initialize_ocr(['en', 'ko'], True)
+            texts, annotated_image = perform_ocr_with_rotation(reader, image_path, roi)
 
 
 
-        if texts is not None and annotated_image is not None:
-            save_ocr_results(image_path, texts, annotated_image, results_dir)
+            if texts is not None and annotated_image is not None:
+                save_ocr_results(image_path, texts, annotated_image, results_dir)
 
-        display_region, top_left, bottom_right, max_val = debug_template_match(image_path, scale_template_path, scale_roi)
-        perform_ocr(reader, image_path, None, top_left, bottom_right)
-        print("STARTING WEIGHTING --------------------------------")
-        if texts is not None and annotated_image is not None:
-            save_ocr_results(image_path, texts, annotated_image, results_dir)
+            display_region, top_left, bottom_right, max_val = debug_template_match(image_path, scale_template_path, scale_roi)
+            perform_ocr(reader, image_path, None, top_left, bottom_right)
 
-    print("Done. Found " + str(found_amk) + " amk+number patterns.")
+            if texts is not None and annotated_image is not None:
+                save_ocr_results(image_path, texts, annotated_image, results_dir)
+
+    if not RASPI:
+        print("Done. Found " + str(found_amk) + " amk+number patterns.")
 
 
 if __name__ == "__main__":
