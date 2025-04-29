@@ -224,6 +224,6 @@ def template_matching(image, scale_template_path, digits_template_dir, roi, debu
     #    f"Weight: {first} . {second} {third} kg (should be counter({validation_counter}): {validation[validation_counter]})")
     # validation_counter += 1
     print(
-        f"Weight: {first} . {second} {third} kg)")
+        f"Weight: {first} . {second} {third} kg")
 
     cv2.destroyAllWindows()

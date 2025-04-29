@@ -8,7 +8,7 @@ import template_matching
 
 DEBUG_BARCODE = False  # Set to True to save images with barcode bounding boxes
 DEBUG_BARCODE_FOLDER = "debug_results_barcode"
-RASPI = False
+RASPI = True
 
 
 found_amk = 0
@@ -40,33 +40,7 @@ def find_amk_codes(text_lines):
         matches.extend(found)
 
     return matches
-"""
-#We dont use prepocessing bc the results are worse...
-def preprocess_image(image):
-    # Convert to grayscale
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    # Apply Gaussian blur
-    blur = cv2.GaussianBlur(gray, (3, 3), 0)
-
-
-    # Adaptive thresholding
-    thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-
-    #denoised = cv2.medianBlur(gray, 7)  # Try 3, 5, or 7
-
-    # Denoise the image
-    denoised = cv2.fastNlMeansDenoising(thresh, h=30)
-    #denoised = gray
-    # Sharpen the image
-    kernel = np.array([[0, -1, 0],
-                       [-1, 5, -1],
-                       [0, -1, 0]])
-    sharpened = cv2.filter2D(denoised, -1, kernel)
-
-    return sharpened
-
-"""
 
 def perform_ocr(reader, image_path, roi=None, top_left=None, bottom_right=None):
     image = cv2.imread(image_path)
