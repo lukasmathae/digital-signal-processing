@@ -8,7 +8,7 @@ import template_matching
 
 DEBUG_BARCODE = False  # Set to True to save images with barcode bounding boxes
 DEBUG_BARCODE_FOLDER = "debug_results_barcode"
-RASPI = True
+RASPI = False
 
 
 found_amk = 0
@@ -134,8 +134,8 @@ def save_ocr_results(image_path, texts, annotated_image, output_dir="results"):
         for line in texts:
             f.write(line + "\n")
         if amk_matches:
-            print(f"=================================(Found {len(amk_matches)} amk+number patterns)=======================")
             f.write("\n--- amk Matches ---\n")
+            print("--- amk Matches ---")
             found_amk += 1
             for match in amk_matches:
                 f.write(match + "\n")
@@ -203,42 +203,6 @@ def perform_ocr_with_rotation(reader, image_path, roi=None):
 
     print("No amk code found in any rotation.")
     return None, None
-
-
-def debug_template_match(full_image_path, template_image_path, roi, debug=False):
-    # Load the full image and the template
-    x, y, w, h = roi
-    full_image_gray = cv2.imread(full_image_path, cv2.IMREAD_GRAYSCALE)
-    full_image_color_rotated = cv2.rotate(full_image_gray, cv2.ROTATE_180)
-
-    roi_image = full_image_color_rotated[y:y + h, x:x + w].copy()
-    template_gray = cv2.imread(template_image_path, cv2.IMREAD_GRAYSCALE)
-
-    # Perform template matching
-    res = cv2.matchTemplate(roi_image, template_gray, cv2.TM_CCOEFF_NORMED)
-    _, max_val, _, max_loc = cv2.minMaxLoc(res)
-
-    # Define the bounding box of the matched region
-    h, w = template_gray.shape
-    top_left = max_loc
-    bottom_right = (top_left[0] + w, top_left[1] + h)
-
-    # Draw rectangle for visualization
-    cv2.rectangle(roi_image, top_left, bottom_right, (0, 255, 0), 2)
-
-    # Extract and show/save ROI
-    display_region = roi_image[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
-
-    # Optional: save the debug result
-    #cv2.imwrite(debug_output_path, full_image_color)
-    #cv2.imshow("Matched Template Region", full_image_color)
-    if debug:
-        cv2.imshow("Extracted ROI ", display_region)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
-    return display_region, top_left, bottom_right, max_val
-
 
 def rotate_image(image, angle):
     """Rotate image to given angle."""
@@ -329,21 +293,14 @@ def main():
         # Scale and Template matching (Performance++)
         template_matching.template_matching(image_path, scale_template_path, "scale_digit_templates", scale_roi, False, False)
         if not RASPI:
-            # Scale + AMK
+            # AMK
             #texts, annotated_image = perform_ocr(reader, image_path, roi)
             reader = initialize_ocr(['en', 'ko'], True)
             texts, annotated_image = perform_ocr_with_rotation(reader, image_path, roi)
 
-
-
             if texts is not None and annotated_image is not None:
                 save_ocr_results(image_path, texts, annotated_image, results_dir)
 
-            display_region, top_left, bottom_right, max_val = debug_template_match(image_path, scale_template_path, scale_roi)
-            perform_ocr(reader, image_path, None, top_left, bottom_right)
-
-            if texts is not None and annotated_image is not None:
-                save_ocr_results(image_path, texts, annotated_image, results_dir)
 
     if not RASPI:
         print("Done. Found " + str(found_amk) + " amk+number patterns.")
