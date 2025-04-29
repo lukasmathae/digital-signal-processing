@@ -205,17 +205,17 @@ def perform_ocr_with_rotation(reader, image_path, roi=None):
     return None, None
 
 
-def debug_template_match(full_image_path, template_image_path, roi=None, debug_output_path='debug_output.jpg'):
+def debug_template_match(full_image_path, template_image_path, roi, debug=False):
     # Load the full image and the template
     x, y, w, h = roi
-    full_image_color = cv2.imread(full_image_path)
-    full_image_color = cv2.rotate(full_image_color, cv2.ROTATE_180)
-    full_image_gray = cv2.cvtColor(full_image_color, cv2.COLOR_BGR2GRAY)
-    roi_image = full_image_gray[y:y + h, x:x + w].copy()
+    full_image_gray = cv2.imread(full_image_path, cv2.IMREAD_GRAYSCALE)
+    full_image_color_rotated = cv2.rotate(full_image_gray, cv2.ROTATE_180)
+
+    roi_image = full_image_color_rotated[y:y + h, x:x + w].copy()
     template_gray = cv2.imread(template_image_path, cv2.IMREAD_GRAYSCALE)
 
     # Perform template matching
-    res = cv2.matchTemplate(full_image_gray, template_gray, cv2.TM_CCOEFF_NORMED)
+    res = cv2.matchTemplate(roi_image, template_gray, cv2.TM_CCOEFF_NORMED)
     _, max_val, _, max_loc = cv2.minMaxLoc(res)
 
     # Define the bounding box of the matched region
@@ -224,17 +224,18 @@ def debug_template_match(full_image_path, template_image_path, roi=None, debug_o
     bottom_right = (top_left[0] + w, top_left[1] + h)
 
     # Draw rectangle for visualization
-    cv2.rectangle(full_image_color, top_left, bottom_right, (0, 255, 0), 2)
+    cv2.rectangle(roi_image, top_left, bottom_right, (0, 255, 0), 2)
 
     # Extract and show/save ROI
-    display_region = full_image_color[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
+    display_region = roi_image[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
 
     # Optional: save the debug result
     #cv2.imwrite(debug_output_path, full_image_color)
     #cv2.imshow("Matched Template Region", full_image_color)
-    #cv2.imshow("Extracted ROI", display_region)
-    #cv2.waitKey(0)
-    #cv2.destroyAllWindows()
+    if debug:
+        cv2.imshow("Extracted ROI ", display_region)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
     return display_region, top_left, bottom_right, max_val
 
@@ -345,28 +346,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-
-
-'''
-def scan_folder(folder_path):
-    """Scan all images in a folder for barcodes."""
-    results = {}
-    for filename in os.listdir(folder_path):
-        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
-            full_path = os.path.join(folder_path, filename)
-            barcodes = process_image(full_path)
-            results[filename] = barcodes
-    return results
-
-
-# ======= USAGE ========
-if __name__ == "__main__":
-    folder = "/home/lukas/abroad/courses/digitalSignalProcessing/digital-signal-processing/dataset"
-    result = scan_folder(folder)
-
-    print("\n=== Summary ===")
-    for fname, barcodes in result.items():
-
-
-'''
 
