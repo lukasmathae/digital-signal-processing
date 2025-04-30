@@ -5,6 +5,10 @@ import os
 import re
 from pyzbar import pyzbar
 import template_matching
+import pandas as pd
+
+results = []
+
 
 DEBUG_BARCODE = False  # Set to True to save images with barcode bounding boxes
 DEBUG_BARCODE_FOLDER = "debug_results_barcode"
@@ -253,6 +257,14 @@ def main():
     # Define the region of interest: (x, y, width, height)
     roi = (500, 0, 2500, 2500)
     scale_roi = (1500, 350, 1000, 500)
+
+    amks = []
+    weights = []
+    barcodes = []
+
+    amks.append("AMKs")
+    weights.append("Weights")
+    barcodes.append("Barcodes")
     for image_path in image_files:
         print(f"===========================================================================================================")
         print(f"[*] Processing image: {image_path}")
@@ -265,7 +277,17 @@ def main():
             print(f"{image_path}: No barcode found.")
 
         # Scale and Template matching (Performance++)
-        template_matching.template_matching(image_path, scale_template_path, "scale_digit_templates", scale_roi, False, False)
+        first, second, third = template_matching.template_matching(image_path, scale_template_path,
+                                                                   "scale_digit_templates", scale_roi,
+                                                                   False, False)
+        weight = "Nan"
+        if first == " Nan " or second == " Nan " or third == " Nan ":
+            print('Could not find a valid weight!')
+            weight = "Nan"
+        else:
+            weight = float(f"{first}.{second}{third}")
+
+        amk = None
         if not RASPI:
             # AMK
             #texts, annotated_image = perform_ocr(reader, image_path, roi)
@@ -274,11 +296,20 @@ def main():
 
             if texts is not None and annotated_image is not None:
                 save_ocr_results(image_path, texts, annotated_image, results_dir)
+                amk = texts
 
+        barcode_data = "; ".join(
+            [f"[{btype}] {data}" for data, btype, rect in found_barcode]) if found_barcode else "None"
 
-    if not RASPI:
-        print("Done. Found " + str(found_amk) + " amk+number patterns.")
+        results.append({
+            "image_path": image_path,
+            "barcode": barcode_data,
+            "weight": weight,
+            "amk": amk if amk else "None"
+        })
 
+    df = pd.DataFrame(results)
+    df.to_csv("results.csv", index=False)
 
 if __name__ == "__main__":
     main()

@@ -227,3 +227,5 @@ def template_matching(image, scale_template_path, digits_template_dir, roi, debu
         f"Weight: {first} . {second} {third} kg")
 
     cv2.destroyAllWindows()
+    return first, second, third
+
