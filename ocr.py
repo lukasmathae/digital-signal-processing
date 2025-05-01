@@ -125,6 +125,7 @@ def save_ocr_results(image_path, texts, annotated_image, output_dir="results"):
     image_output_path = os.path.join(pictures_dir, base_name + ".jpg")
     cv2.imwrite(image_output_path, annotated_image)
     print(f"Saved annotated image to: {image_output_path}")
+    return amk_matches
 
 
 
@@ -295,8 +296,7 @@ def main():
             texts, annotated_image = perform_ocr_with_rotation(reader, image_path, roi)
 
             if texts is not None and annotated_image is not None:
-                save_ocr_results(image_path, texts, annotated_image, results_dir)
-                amk = texts
+                amk = save_ocr_results(image_path, texts, annotated_image, results_dir)
 
         barcode_data = "; ".join(
             [f"[{btype}] {data}" for data, btype, rect in found_barcode]) if found_barcode else "None"
