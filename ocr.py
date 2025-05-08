@@ -7,12 +7,16 @@ from pyzbar import pyzbar
 import template_matching
 import pandas as pd
 
+from ultralytics import YOLO
+
+
+
 results = []
 
 
 DEBUG_BARCODE = False  # Set to True to save images with barcode bounding boxes
 DEBUG_BARCODE_FOLDER = "debug_results_barcode"
-RASPI = True
+RASPI = False
 
 
 found_amk = 0
@@ -263,6 +267,12 @@ def main():
     weights = []
     barcodes = []
 
+    # Load a model
+    model = YOLO(
+        '/home/lukas/ausland/course/digital-signal-processing/digital-signal-processing/best.pt')  # load a pretrained model (recommended for training)
+
+    model.fuse()
+
     amks.append("AMKs")
     weights.append("Weights")
     barcodes.append("Barcodes")
@@ -291,12 +301,39 @@ def main():
         amk = None
         if not RASPI:
             # AMK
-            #texts, annotated_image = perform_ocr(reader, image_path, roi)
             reader = initialize_ocr(['en', 'ko'], True)
-            texts, annotated_image = perform_ocr_with_rotation(reader, image_path, roi)
+            image = cv2.imread(image_path)
+            if image is None:
+                print(f"[!] Failed to load image: {image_path}")
+                return []
 
-            if texts is not None and annotated_image is not None:
-                amk = save_ocr_results(image_path, texts, annotated_image, results_dir)
+            image = cv2.rotate(image, cv2.ROTATE_180)
+            yolo_results = model(image)
+            for single_result in yolo_results:
+
+                #print("[*] YOLO results: ", single_result)
+                # Extract bounding boxes and class names
+                boxes = single_result.boxes.cpu().numpy()
+                class_names = single_result.names
+
+
+
+                xyxys = boxes.xyxy
+                xywh = boxes.xywh
+                print(f"XYXYXY: {xyxys}")
+                print(f"XYWH: {xywh}")
+
+                for counter in range(xyxys.shape[0]):
+
+                    #debug = cv2.rectangle(image, (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])), (0, 255, 0), 2)
+                    #cv2.imshow("debug", debug)
+                    #cv2.waitKey(0)
+                    roi = (int(xyxys[counter][0]), int(xyxys[counter][1]), int(xywh[counter][0]), int(xywh[counter][1]))
+
+                    texts, annotated_image = perform_ocr_with_rotation(reader, image_path, roi)
+
+                    if texts is not None and annotated_image is not None:
+                        amk = save_ocr_results(image_path, texts, annotated_image, results_dir)
 
         barcode_data = "; ".join(
             [f"[{btype}] {data}" for data, btype, rect in found_barcode]) if found_barcode else "None"
