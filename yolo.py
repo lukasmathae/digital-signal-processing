@@ -27,7 +27,8 @@ def read_ground_truth(ground_truth_file):
 
 def main():
     model = YOLO('best_label_and_scale_display.pt')
-    model_weight = YOLO('best_weights_mmodel.pt')
+    model_weight = YOLO('best_created_data.pt')
+
 
     # Load original image
     original_img = cv2.imread("dataset/20250403_114728.jpg")
@@ -130,35 +131,42 @@ def main():
                 #cv2.imshow(f"YOLO result for class '{class_name}'", cropped)
                 #cv2.waitKey(0)
                 #cv2.destroyAllWindows()
-
                 if class_name == 'scale_display':
                     results_weight = model_weight(cropped)
+                    class_names_weights = model_weight.names  # {0: '1', 1: '2-dot', 2: '3-kg', ...}
 
-                    # Get class names from the model
-                    class_names_weights = model_weight.names  # e.g., {0: 'label', 1: 'scale_display'}
+                    best_dot = (" Nan ", 0.0)  # (class_name, confidence)
+                    best_number = (" Nan ", 0.0)
+                    best_kg = (" Nan ", 0.0)
 
-
-                    first = " Nan "
-                    second = " Nan "
-                    third = " Nan "
                     for digit in results_weight:
                         boxes_weight = digit.boxes
-                        for j, box_weight in enumerate(boxes_weight):
-                            # Get class ID and class name
+                        for box_weight in boxes_weight:
                             class_id = int(box_weight.cls[0].cpu().numpy())
                             class_name = class_names_weights[class_id]
-                            if "-dot" in  class_name and first == " Nan ":
-                                sub = class_name.replace("-dot", "")
-                                first = sub
-                            elif "-kg" in class_name and third == " Nan ":
-                                sub = class_name.replace("-kg", "")
-                                third = sub
-                            elif "-dot" not in class_name and "-kg" not in class_name and second == " Nan ":
-                                second = class_name
-                            if first != " Nan " and second != " Nan " and third != " Nan ":
-                                break
+                            conf = float(box_weight.conf[0].cpu().numpy())
 
-                            print("Found classes: ", class_name)
+                            if "-dot" in class_name:
+                                sub = class_name.replace("-dot", "")
+                                if conf > best_dot[1]:
+                                    best_dot = (sub, conf)
+
+                            elif "-kg" in class_name:
+                                sub = class_name.replace("-kg", "")
+                                if conf > best_kg[1]:
+                                    best_kg = (sub, conf)
+
+                            else:
+                                if conf > best_number[1]:
+                                    best_number = (class_name, conf)
+
+                            print("Found class:", class_name, "with confidence:", conf)
+
+                    first = best_dot[0]
+                    second = best_number[0]
+                    third = best_kg[0]
+
+                    print("Selected:", first, second, third)
 
                     print("Found weight: " + first + "." + second + "" + third + " kg")
                     print("Ground truth: ", ground_truth[image_path]["weight"])
