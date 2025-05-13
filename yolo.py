@@ -4,6 +4,8 @@ import cv2
 from ultralytics import YOLO
 
 ground_truth = {}
+correct = 0
+count = 0
 
 def get_image_files_from_directory(directory):
     """Returns a list of image file paths from the given directory."""
@@ -26,9 +28,13 @@ def read_ground_truth(ground_truth_file):
 
 
 def main():
-    model = YOLO('best_label_and_scale_display.pt')
-    model_weight = YOLO('best_created_data.pt')
+    global count
+    global correct
 
+    model = YOLO('best_label_and_scale_display.pt')
+    #model_weight = YOLO('best_created_data.pt')
+    model_weight = YOLO('best_weights_full1.pt')
+    #model_weight = YOLO("/home/lukas/ausland/course/digital-signal-processing/modelTraining/runs/detect/train6/weights/best.pt")
 
     # Load original image
     original_img = cv2.imread("dataset/20250403_114728.jpg")
@@ -86,7 +92,7 @@ def main():
                         class_id = int(box_weight.cls[0].cpu().numpy())
                         class_name = class_names_weights[class_id]
                         print("Found weights: ", class_name)
-                    digit.show()
+                    #digit.show()
 
 
     ###  HERE LOOP FOR ALL IMAGES
@@ -170,7 +176,15 @@ def main():
 
                     print("Found weight: " + first + "." + second + "" + third + " kg")
                     print("Ground truth: ", ground_truth[image_path]["weight"])
-                    #tmp_weight = float(first + "." + second + "" + third)
+                    if first != " Nan " and second != " Nan " and third != " Nan ":
+                        tmp_weight = float(first + "." + second + "" + third)
+                        if tmp_weight == ground_truth[image_path]["weight"]:
+                            correct += 1
+                    count += 1
+
+    print("Accuracy: ", correct / count)
+    print("Correct =  ", correct)
+    print("Counter = ", count)
 
 
 
