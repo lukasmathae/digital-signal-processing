@@ -9,7 +9,9 @@ import pandas as pd
 
 from ultralytics import YOLO
 
+# in directory holding pictures
 
+# out csv path
 
 results = []
 
