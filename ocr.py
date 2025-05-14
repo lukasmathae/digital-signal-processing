@@ -249,9 +249,9 @@ def process_image_barcode(file_path):
     return []
 
 
-def main():
-    dataset_dir = "dataset"
-    results_dir = "results"
+def analyze_image(dataset_path):
+    dataset_dir = dataset_path
+    #results_dir = "results"
     scale_template_path = "scale_display.png"
     image_files = get_image_files_from_directory(dataset_dir)
 
@@ -335,7 +335,8 @@ def main():
                     texts, annotated_image = perform_ocr_with_rotation(reader, image_path, roi)
 
                     if texts is not None and annotated_image is not None:
-                        amk = save_ocr_results(image_path, texts, annotated_image, results_dir)
+                        #amk = save_ocr_results(image_path, texts, annotated_image, results_dir)
+                        amk = find_amk_codes(texts)
 
         barcode_data = "; ".join(
             [f"[{btype}] {data}" for data, btype, rect in found_barcode]) if found_barcode else "None"
@@ -348,9 +349,9 @@ def main():
         })
 
     df = pd.DataFrame(results)
-    df.to_csv("results.csv", index=False)
+    df.to_csv(f'{dataset_path}/results.csv', index=False)
 
-if __name__ == "__main__":
-    main()
+    return f'{dataset_path}/results.csv'
+
 
 
