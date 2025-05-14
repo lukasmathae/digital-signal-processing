@@ -1,14 +1,18 @@
+import os
+import sys
+from pathlib import Path
+from datetime import datetime
 import tkinter as tk
 from tkinter import messagebox
 import cv2
 from PIL import Image, ImageTk
-import pandas as pd
-import numpy as np
-import os
 # from ai_model import analyze_image  # Your AI model logic
 
-output_csv = "output.csv"
-captured_image_path = "captured_image.jpg"
+def resource_path(relative_path):
+    documents_path = Path.home() / "Documents"
+    save_folder = documents_path / "Digital Signal Processing"
+
+    return str(save_folder / relative_path)
 
 class App:
     def __init__(self, root):
@@ -32,17 +36,18 @@ class App:
         self.crop_btn = tk.Button(self.buttons_frame, text="Crop Image", command=self.enable_crop_mode)
         self.apply_crop_btn = tk.Button(self.buttons_frame, text="Apply Crop", command=self.apply_crop)
         self.undo_crop_btn = tk.Button(self.buttons_frame, text="Undo Crop", command=self.undo_crop)
+        self.save_image_btn = tk.Button(self.buttons_frame, text="Save Image", command=self.save_image)
         self.analyze_btn = tk.Button(self.buttons_frame, text="Analyze Image", command=self.analyze)
-        self.save_btn = tk.Button(self.buttons_frame, text="Save to CSV", command=self.save_to_csv)
 
         for btn in [self.rotate_btn, self.crop_btn, self.apply_crop_btn,
-                    self.undo_crop_btn, self.analyze_btn, self.save_btn]:
+                    self.undo_crop_btn, self.save_image_btn, self.analyze_btn]:
             btn.pack(pady=2)
 
         self.original_image = None
         self.image = None
         self.result = None
         self.tk_img = None
+        self.images_directory = None
 
         # Crop logic
         self.crop_box = None
@@ -73,7 +78,6 @@ class App:
     def capture_image(self):
         if self.current_frame is not None:
             self.previewing = False  # stop updating video
-            cv2.imwrite(captured_image_path, self.current_frame)
             self.image = Image.fromarray(cv2.cvtColor(self.current_frame, cv2.COLOR_BGR2RGB))
             self.original_image = self.image.copy()
             self.show_static_image()
@@ -81,7 +85,6 @@ class App:
             self.capture_btn.pack_forget()
             self.retake_btn.pack(pady=5)
             self.buttons_frame.pack()
-            messagebox.showinfo("Captured", "Image captured.")
 
     def retake_picture(self):
         self.image = None
@@ -189,30 +192,30 @@ class App:
             self.image = self.original_image.copy()
             self.show_static_image()
 
-    def analyze(self):
-        if self.image:
-            temp_path = "temp_to_analyze.jpg"
-            self.image.save(temp_path)
-            # self.result = analyze_image(temp_path)
-            messagebox.showinfo("Result", f"Analysis: {self.result}")
+    def save_image(self):
+        if self.images_directory is None:
+            base_dir = datetime.now().strftime("%Y-%m-%d")
+            dir_name = resource_path(base_dir)
+            counter = 1
+            while os.path.exists(dir_name):
+                dir_name = f"{base_dir}-{counter}"
+                counter += 1
+            os.makedirs(dir_name)
+            self.images_directory = dir_name
 
-    def save_to_csv(self):
-        if self.result is not None:
-            new_row = {"Image": captured_image_path, "Result": self.result}
-            if os.path.exists(output_csv):
-                df = pd.read_csv(output_csv)
-                df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-            else:
-                df = pd.DataFrame([new_row])
-            df.to_csv(output_csv, index=False)
-            messagebox.showinfo("Saved", "Result saved to CSV!")
+        existing_files = os.listdir(self.images_directory)
+        image_count = len([f for f in existing_files if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
+        image_filename = f"image{image_count + 1}.jpg"
+        save_path = os.path.join(self.images_directory, image_filename)
+        self.image.save(save_path)
+        messagebox.showinfo("Image saved", f"Image saved in {save_path}")
+
+    def analyze(self):
+        if self.images_directory is not None:
+            # self.result = analyze_image(self.images_directory)
+            messagebox.showinfo("Result", f"Analysis: {self.result}")
+            self.images_directory = None
 
     def __del__(self):
         if self.cap and self.cap.isOpened():
             self.cap.release()
-
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = App(root)
-    root.mainloop()
