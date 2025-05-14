@@ -34,7 +34,7 @@ def main():
     model = YOLO('best_label_and_scale_display.pt')
     #model_weight = YOLO('best_created_data.pt')
     model_weight = YOLO('best_weights_full1.pt')
-    #model_weight = YOLO("/home/lukas/ausland/course/digital-signal-processing/modelTraining/runs/detect/train6/weights/best.pt")
+    #model_weight = YOLO("/home/lukas/ausland/course/digital-signal-processing/modelTraining/runs/detect/train7/weights/best.pt")
 
     # Load original image
     original_img = cv2.imread("dataset/20250403_114728.jpg")
