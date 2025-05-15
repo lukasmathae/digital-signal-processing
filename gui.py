@@ -6,7 +6,7 @@ import tkinter as tk
 from tkinter import messagebox
 import cv2
 from PIL import Image, ImageTk
-# from ai_model import analyze_image  # Your AI model logic
+from ocr import analyze_image
 
 def resource_path(relative_path):
     documents_path = Path.home() / "Documents"
@@ -212,7 +212,7 @@ class App:
 
     def analyze(self):
         if self.images_directory is not None:
-            # self.result = analyze_image(self.images_directory)
+            self.result = analyze_image(self.images_directory)
             messagebox.showinfo("Result", f"Analysis: {self.result}")
             self.images_directory = None
 

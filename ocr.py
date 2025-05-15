@@ -141,11 +141,7 @@ def get_image_files_from_directory(directory):
     return [os.path.join(directory, f) for f in sorted(os.listdir(directory))
             if f.lower().endswith(supported_extensions)]
 
-def perform_ocr_with_rotation(reader, image_path, roi=None):
-    image = cv2.imread(image_path)
-    if image is None:
-        print(f"Error: Could not read image {image_path}")
-        return None, None
+def perform_ocr_with_rotation(reader, image, roi=None):
 
     rotations = {
         180: cv2.rotate(image, cv2.ROTATE_180),
@@ -270,10 +266,9 @@ def analyze_image(dataset_path):
     barcodes = []
 
     # Load a model
-    model = YOLO(
-        '/home/lukas/ausland/course/digital-signal-processing/digital-signal-processing/best.pt')  # load a pretrained model (recommended for training)
-
-    model.fuse()
+    model = YOLO('best_label_and_scale_display.pt')
+    model_weight = YOLO('best_weights_full1.pt')
+    class_names = model.names
 
     amks.append("AMKs")
     weights.append("Weights")
@@ -281,62 +276,103 @@ def analyze_image(dataset_path):
     for image_path in image_files:
         print(f"===========================================================================================================")
         print(f"[*] Processing image: {image_path}")
-        # Barcode
-        found_barcode = process_image_barcode(image_path)
-        if found_barcode:
-            for data, btype, rect in found_barcode:
-                print(f"{image_path}: [{btype}] {data}")
-        else:
-            print(f"{image_path}: No barcode found.")
+        original_img = cv2.imread(image_path)
+        original_img = cv2.rotate(original_img, cv2.ROTATE_180)
 
-        # Scale and Template matching (Performance++)
-        first, second, third = template_matching.template_matching(image_path, scale_template_path,
-                                                                   "scale_digit_templates", scale_roi,
-                                                                   False, False)
+        results_model = model(original_img)
         weight = "Nan"
-        if first == " Nan " or second == " Nan " or third == " Nan ":
-            print('Could not find a valid weight!')
-            weight = "Nan"
-        else:
-            weight = float(f"{first}.{second}{third}")
+        for i, result in enumerate(results_model):
+            boxes = result.boxes
+            for j, box in enumerate(boxes):
+                # Get bounding box
+                xyxy = box.xyxy[0].cpu().numpy().astype(int)
+                x1, y1, x2, y2 = xyxy
 
-        amk = None
-        if not RASPI:
-            # AMK
-            reader = initialize_ocr(['en', 'ko'], True)
-            image = cv2.imread(image_path)
-            if image is None:
-                print(f"[!] Failed to load image: {image_path}")
-                return []
+                # Get class ID and class name
+                class_id = int(box.cls[0].cpu().numpy())
+                class_name = class_names[class_id]
 
-            image = cv2.rotate(image, cv2.ROTATE_180)
-            yolo_results = model(image)
-            for single_result in yolo_results:
+                # Crop detected region
+                cropped = original_img[y1:y2, x1:x2]
 
-                #print("[*] YOLO results: ", single_result)
-                # Extract bounding boxes and class names
-                boxes = single_result.boxes.cpu().numpy()
-                class_names = single_result.names
+                # Save with class in filename
+                filename = f"cropped_{class_name}_{i}_{j}.jpg"
+                # cv2.imwrite(filename, cropped)
+                # print(f"Saved {filename} for class '{class_name}'")
+
+                # cv2.imshow(f"YOLO result for class '{class_name}'", cropped)
+                # cv2.waitKey(0)
+                # cv2.destroyAllWindows()
+                if class_name == 'scale_display':
+                    results_weight = model_weight(cropped)
+                    class_names_weights = model_weight.names  # {0: '1', 1: '2-dot', 2: '3-kg', ...}
+
+                    best_dot = (" Nan ", 0.0)  # (class_name, confidence)
+                    best_number = (" Nan ", 0.0)
+                    best_kg = (" Nan ", 0.0)
+
+                    for digit in results_weight:
+                        boxes_weight = digit.boxes
+                        for box_weight in boxes_weight:
+                            class_id = int(box_weight.cls[0].cpu().numpy())
+                            class_name = class_names_weights[class_id]
+                            conf = float(box_weight.conf[0].cpu().numpy())
+
+                            if "-dot" in class_name:
+                                sub = class_name.replace("-dot", "")
+                                if conf > best_dot[1]:
+                                    best_dot = (sub, conf)
+
+                            elif "-kg" in class_name:
+                                sub = class_name.replace("-kg", "")
+                                if conf > best_kg[1]:
+                                    best_kg = (sub, conf)
+
+                            else:
+                                if conf > best_number[1]:
+                                    best_number = (class_name, conf)
+
+                            print("Found class:", class_name, "with confidence:", conf)
+
+                    first = best_dot[0]
+                    second = best_number[0]
+                    third = best_kg[0]
+
+                    print("Selected:", first, second, third)
+                    if first != " Nan " and second != " Nan " and third != " Nan ":
+                        found_weight = float(first + "." + second + "" + third)
+
+                    if first == " Nan " or second == " Nan " or third == " Nan ":
+                        print('Could not find a valid weight!')
+                        weight = "Nan"
+                    else:
+                        weight = float(f"{first}.{second}{third}")
 
 
+                if class_name == 'label':
 
-                xyxys = boxes.xyxy
-                xywh = boxes.xywh
-                print(f"XYXYXY: {xyxys}")
-                print(f"XYWH: {xywh}")
+                    # Barcode
+                    found_barcode = process_image_barcode(image_path)
+                    if found_barcode:
+                        for data, btype, rect in found_barcode:
+                            print(f"{image_path}: [{btype}] {data}")
+                    else:
+                        print(f"{image_path}: No barcode found.")
 
-                for counter in range(xyxys.shape[0]):
+                    amk = None
+                    if not RASPI:
+                        # AMK
+                        reader = initialize_ocr(['en', 'ko'], True)
 
-                    #debug = cv2.rectangle(image, (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])), (0, 255, 0), 2)
-                    #cv2.imshow("debug", debug)
-                    #cv2.waitKey(0)
-                    roi = (int(xyxys[counter][0]), int(xyxys[counter][1]), int(xywh[counter][0]), int(xywh[counter][1]))
+                        #cv2.imshow("LABEL",cropped)
+                        #cv2.waitKey(0)
+                        #cv2.destroyAllWindows()
 
-                    texts, annotated_image = perform_ocr_with_rotation(reader, image_path, roi)
+                        texts, annotated_image = perform_ocr_with_rotation(reader, cropped)
 
-                    if texts is not None and annotated_image is not None:
-                        #amk = save_ocr_results(image_path, texts, annotated_image, results_dir)
-                        amk = find_amk_codes(texts)
+                        if texts is not None and annotated_image is not None:
+                            #amk = save_ocr_results(image_path, texts, annotated_image, results_dir)
+                            amk = find_amk_codes(texts)
 
         barcode_data = "; ".join(
             [f"[{btype}] {data}" for data, btype, rect in found_barcode]) if found_barcode else "None"
