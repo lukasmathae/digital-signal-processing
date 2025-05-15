@@ -144,8 +144,8 @@ def get_image_files_from_directory(directory):
 def perform_ocr_with_rotation(reader, image, roi=None):
 
     rotations = {
+        0: image,
         180: cv2.rotate(image, cv2.ROTATE_180),
-        #0: image,
         90: cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE),
         270: cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
     }
@@ -218,18 +218,12 @@ def draw_barcodes(image, barcodes):
     return image
 
 
-def process_image_barcode(file_path):
-    """Process one image and try multiple rotations for barcode detection."""
-    image = cv2.imread(file_path)
-    if image is None:
-        print(f"[!] Failed to load image: {file_path}")
-        return []
-
-    for angle in [180, 90, 0, 270]:
+def process_image_barcode(image):
+    for angle in [0, 180, 90, 270]:
         rotated = rotate_image(image, angle)
         barcodes = decode_barcodes(rotated)
         if barcodes:
-            print(f"[✓] Found Barcode in {os.path.basename(file_path)} (rotation: {angle}°)")
+            print(f"[✓] Found Barcode in (rotation: {angle}°)")
 
             if DEBUG_BARCODE:
                 debug_image = draw_barcodes(rotated.copy(), barcodes)
@@ -241,7 +235,7 @@ def process_image_barcode(file_path):
 
             return barcodes
 
-    print(f"[x] No barcode found in {os.path.basename(file_path)}")
+    print(f"[x] No barcode found!")
     return []
 
 
@@ -352,7 +346,7 @@ def analyze_image(dataset_path):
                 if class_name == 'label':
 
                     # Barcode
-                    found_barcode = process_image_barcode(image_path)
+                    found_barcode = process_image_barcode(cropped)
                     if found_barcode:
                         for data, btype, rect in found_barcode:
                             print(f"{image_path}: [{btype}] {data}")
@@ -363,16 +357,10 @@ def analyze_image(dataset_path):
                     if not RASPI:
                         # AMK
                         reader = initialize_ocr(['en', 'ko'], True)
-
-                        #cv2.imshow("LABEL",cropped)
-                        #cv2.waitKey(0)
-                        #cv2.destroyAllWindows()
-
                         texts, annotated_image = perform_ocr_with_rotation(reader, cropped)
 
                         if texts is not None and annotated_image is not None:
-                            #amk = save_ocr_results(image_path, texts, annotated_image, results_dir)
-                            amk = find_amk_codes(texts)
+                            amk = save_ocr_results(image_path, texts, annotated_image, "results")
 
         barcode_data = "; ".join(
             [f"[{btype}] {data}" for data, btype, rect in found_barcode]) if found_barcode else "None"
