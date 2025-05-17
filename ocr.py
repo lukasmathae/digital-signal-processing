@@ -6,17 +6,14 @@ import re
 from pyzbar import pyzbar
 import template_matching
 import pandas as pd
-
+from pathlib import Path
 from ultralytics import YOLO
 
-# in directory holding pictures
-
-# out csv path
 
 results = []
 
 
-DEBUG_BARCODE = False  # Set to True to save images with barcode bounding boxes
+DEBUG_BARCODE = False
 DEBUG_BARCODE_FOLDER = "debug_results_barcode"
 RASPI = False
 
@@ -25,15 +22,43 @@ found_amk = 0
 
 
 def initialize_ocr(languages=None, gpu=False):
-    """Initializes the EasyOCR reader with given languages."""
+    """
+    Initializes an OCR reader with specified languages and GPU acceleration support.
+
+    This function creates an EasyOCR reader instance configured with the desired
+    languages for text recognition and an option to enable GPU-based processing.
+
+    Parameters:
+    languages : list[str], optional
+        List of languages for OCR. Defaults to ['en'] if not provided.
+    gpu : bool
+        Whether to enable GPU acceleration. Defaults to False.
+
+    Returns:
+    easyocr.Reader
+        The initialized OCR reader configured with the specified languages and GPU
+        setting.
+    """
     if languages is None:
         languages = ['en']
     return easyocr.Reader(languages, gpu=gpu)
 
 def find_amk_codes(text_lines):
     """
-    Finds patterns similar to AMK+5 digits in OCR text lines.
-    Accepts: AMK12345, AMK-12345, amk 12345, mk12345, etc.
+    Extracts specific AMK codes from a list of text lines using a regex pattern.
+
+    The function searches through a given list of text lines to find all matches of
+    AMK codes. AMK codes adhere to a specific pattern consisting of the prefix
+    "AMK" (case-insensitive) followed by an optional space or hyphen, and a series
+    of 5 digits. The function returns all matching codes found across the input
+    lines.
+
+    Parameters:
+        text_lines (list of str): The list of text lines to search for AMK codes.
+
+    Returns:
+        list of str: A list of matched AMK codes extracted from the input text
+        lines.
     """
     #pattern = r'AMK[-\s]?\d+'
 
@@ -53,6 +78,46 @@ def find_amk_codes(text_lines):
 
 
 def perform_ocr(reader, image_path, roi=None, top_left=None, bottom_right=None):
+    """
+    Performs Optical Character Recognition (OCR) on a specified image using a given
+    OCR reader. It optionally allows defining a region of interest (ROI) either through
+    explicit ROI values or rectangular bounding box coordinates.
+
+    Parameters:
+    reader : Any
+        An OCR reader object used to process the image and extract text.
+    image_path : str
+        The path to the image file on which OCR will be performed.
+    roi : Optional[Tuple[int, int, int, int]]
+        A tuple specifying the region of interest in the image as (x, y, width, height).
+        This parameter is optional and is used if top_left and bottom_right are not provided.
+    top_left : Optional[Tuple[int, int]]
+        Coordinates of the top-left corner of a rectangular region of interest. Optional.
+    bottom_right : Optional[Tuple[int, int]]
+        Coordinates of the bottom-right corner of a rectangular region of interest. Optional.
+
+    Returns:
+    Tuple[List[str], Optional[numpy.ndarray]]
+        A tuple where the first element is a list of extracted text strings and the second element
+        is the modified image with bounding boxes and text annotations. If the image cannot be read,
+        returns (None, None).
+
+    Raises:
+    FileNotFoundError
+        If the specified image file is not found or cannot be read.
+
+    Notes:
+    If both `roi` and `top_left`/`bottom_right` parameters are provided, only the `top_left`
+    and `bottom_right` parameters are considered for defining the region of interest.
+
+    The function preprocesses the input image by rotating it 180 degrees and scaling the
+    specified region of interest. The OCR reader then analyzes the preprocessed region for text
+    detection and extraction. Bounding boxes and recognized text are drawn on the region of
+    interest in the output image.
+
+    The time taken to perform the OCR operation is printed to the standard output, along with
+    the name of the input image file being processed.
+    """
     image = cv2.imread(image_path)
     if image is None:
         print(f"Error: Could not read image {image_path}")
@@ -100,7 +165,21 @@ def perform_ocr(reader, image_path, roi=None, top_left=None, bottom_right=None):
 
 
 def save_ocr_results(image_path, texts, annotated_image, output_dir="results"):
-    """Saves OCR text and annotated image to the results directory."""
+    """
+    Saves OCR results including detected text, "amk" code matches, and annotated
+    images to an output directory. Organizes saved data into text and picture files
+    within the specified directory. Ensures directory structure is created if it
+    doesn't exist. Returns the "amk" code matches found in the provided text.
+
+    Args:
+        image_path (str): File path to the input image being processed.
+        texts (list[str]): List of extracted text lines from the OCR process.
+        annotated_image (numpy.ndarray): Image with OCR annotations added.
+        output_dir (str): Directory where the results will be saved. Defaults to "results".
+
+    Returns:
+        list[str]: List of extracted "amk" code matches found in the provided text.
+    """
     os.makedirs(output_dir, exist_ok=True)
     global found_amk
     pictures_dir = os.path.join(output_dir, "pictures")
@@ -136,13 +215,45 @@ def save_ocr_results(image_path, texts, annotated_image, output_dir="results"):
 
 
 def get_image_files_from_directory(directory):
-    """Returns a list of image file paths from the given directory."""
+    """
+    Gets the list of image files from a specified directory. Only files with supported
+    extensions are considered. The function ensures that the returned list of file
+    paths is sorted alphabetically.
+
+    Parameters:
+        directory (str): Path to the directory from which image files are to be
+        retrieved.
+
+    Returns:
+        list[str]: A list of file paths pointing to the image files in the
+        specified directory.
+
+    Raises:
+        FileNotFoundError: If the specified directory does not exist.
+        NotADirectoryError: If the specified path is not a directory.
+    """
     supported_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.tiff')
     return [os.path.join(directory, f) for f in sorted(os.listdir(directory))
             if f.lower().endswith(supported_extensions)]
 
 def perform_ocr_with_rotation(reader, image, roi=None):
+    """
+    Performs OCR on an image at multiple rotations and optionally within a specified region of interest (ROI),
+    returns the recognized text alongside a visualization of the processed image.
 
+    Parameters:
+    reader : Any
+        An OCR reader object capable of performing text recognition.
+    image : numpy.ndarray
+        The input image to process for OCR.
+    roi : tuple[int, int, int, int] | None, optional
+        A tuple representing the region of interest as (x, y, width, height), or None if the entire image is used.
+
+    Returns:
+    tuple[list[str] | None, numpy.ndarray | None]
+        A tuple where the first element is a list of recognized texts if successful, or None if no matches are found,
+        and the second element is the processed image with annotations, or None if no matches are found.
+    """
     rotations = {
         0: image,
         180: cv2.rotate(image, cv2.ROTATE_180),
@@ -186,7 +297,26 @@ def perform_ocr_with_rotation(reader, image, roi=None):
     return None, None
 
 def rotate_image(image, angle):
-    """Rotate image to given angle."""
+    """
+    Rotates an image by a specified angle around its center.
+
+    This function takes an image and rotates it by the given angle, while keeping
+    the center of the image fixed. The output image retains the same dimensions
+    as the input image. The resulting rotation does not involve cropping, and
+    preserves the full image content within the original dimensions.
+
+    Parameters:
+        image (numpy.ndarray): The input image to be rotated. It is expected to
+            be a multidimensional array where the first two dimensions represent
+            the height and width of the image, respectively.
+        angle (float): The angle, in degrees, by which the image will be
+            rotated. Positive values indicate counter-clockwise rotation,
+            while negative values indicate clockwise rotation.
+
+    Returns:
+        numpy.ndarray: The rotated image as the same type and size as the input
+            image, with its orientation changed according to the specified angle.
+    """
     (h, w) = image.shape[:2]
     center = (w // 2, h // 2)
 
@@ -197,7 +327,22 @@ def rotate_image(image, angle):
 
 
 def decode_barcodes(image):
-    """Try to decode barcodes in image using pyzbar."""
+    """
+    Decodes barcodes from an image and returns their data, type, and position.
+
+    This function takes an image as input, decodes the barcodes within it, and
+    returns a list of tuples. Each tuple contains the decoded barcode data, the
+    type of barcode, and its rectangular position within the image.
+
+    Args:
+        image: An image containing one or more barcodes.
+
+    Returns:
+        List of tuples where each tuple consists of:
+        - barcode data as a string
+        - barcode type as a string
+        - rectangular coordinates of the barcode as a tuple (x, y, w, h)
+    """
     barcodes = pyzbar.decode(image)
     results = []
     for barcode in barcodes:
@@ -209,7 +354,29 @@ def decode_barcodes(image):
 
 
 def draw_barcodes(image, barcodes):
-    """Draw rectangles and data around detected barcodes."""
+    """
+    Draws bounding boxes and data on an image for detected barcodes.
+
+    This function processes an input image and overlays bounding boxes and
+    text information for each detected barcode. The information includes
+    the barcode's value and its type. The bounding boxes are drawn using a
+    green rectangle while the text is displayed above the bounding box.
+
+    Parameters:
+    image: numpy.ndarray
+        The input image where barcodes are to be visualized.
+    barcodes: list of tuple
+        A list of barcode information where each tuple contains:
+        - data (str): The value or content of the barcode.
+        - btype (str): The type of the barcode (e.g., QR Code, EAN-13).
+        - rect (tuple of int): The bounding rectangle (x, y, width, height)
+          indicating the position of the barcode in the image.
+
+    Returns:
+    numpy.ndarray
+        The resulting image with barcodes highlighted and labeled.
+
+    """
     for data, btype, rect in barcodes:
         x, y, w, h = rect
         cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
@@ -219,6 +386,27 @@ def draw_barcodes(image, barcodes):
 
 
 def process_image_barcode(image):
+    """
+    Processes an image to detect and decode barcodes at various rotations.
+
+    This function attempts to identify barcodes within the provided image by iteratively
+    rotating it to four preset angles (0°, 180°, 90°, 270°) and decoding for barcodes
+    at each rotation. If a barcode is found, it prints the rotation angle at which it
+    was detected and optionally saves a debug image illustrating the detected barcode.
+
+    Attributes:
+        DEBUG_BARCODE (bool): A global flag that enables or disables saving
+            debug images showcasing detected barcodes.
+        DEBUG_BARCODE_FOLDER (str): A global folder path where debug images
+            are saved if DEBUG_BARCODE is enabled.
+
+    Parameters:
+        image: The input image to process for barcode detection.
+
+    Returns:
+        A list of detected barcodes. Each barcode is represented by its associated
+        data decoded from the image. Returns an empty list if no barcodes are found.
+    """
     for angle in [0, 180, 90, 270]:
         rotated = rotate_image(image, angle)
         barcodes = decode_barcodes(rotated)
@@ -229,7 +417,8 @@ def process_image_barcode(image):
                 debug_image = draw_barcodes(rotated.copy(), barcodes)
                 if not os.path.exists(DEBUG_BARCODE_FOLDER):
                     os.makedirs(DEBUG_BARCODE_FOLDER)
-                debug_filename = os.path.join(DEBUG_BARCODE_FOLDER, f"debug_{angle}_{os.path.basename(file_path)}")
+                timestr = time.strftime("%Y%m%d-%H%M%S")
+                debug_filename = os.path.join(DEBUG_BARCODE_FOLDER, f"debug_{angle}_{os.path.basename(timestr)}.png")
                 cv2.imwrite(debug_filename, debug_image)
                 print(f"    Saved debug image: {debug_filename}")
 
@@ -240,6 +429,37 @@ def process_image_barcode(image):
 
 
 def analyze_image(dataset_path):
+    """
+    Analyzes images within a specified dataset directory by identifying regions of interest,
+    performing object detection using pre-trained YOLO models, extracting relevant data such
+    as scale weights, barcodes, and AMKs, then saves the results into a CSV file.
+
+    Attributes:
+        roi: tuple of int
+            Region of interest dimensions in the format (x, y, width, height) used for
+            processing the images.
+        scale_roi: tuple of int
+            Specific region of interest for detecting scales in the images.
+        amks: list of str
+            Contains extracted AMK-related information from images.
+        weights: list of str
+            Contains weight information detected from scales in the images.
+        barcodes: list of str
+            Contains barcode data identified during image analysis.
+
+    Parameters:
+        dataset_path: str
+            The path to the directory containing image files to analyze.
+
+    Returns:
+        str
+            The path to the location of the generated CSV file containing analyzed results.
+
+    Raises:
+        This function does not explicitly raise errors but depends on external library
+        behavior to handle any exceptions during file I/O, image processing, or object
+        detection tasks.
+    """
     dataset_dir = dataset_path
     #results_dir = "results"
     scale_template_path = "scale_display.png"
@@ -260,8 +480,9 @@ def analyze_image(dataset_path):
     barcodes = []
 
     # Load a model
-    model = YOLO('best_label_and_scale_display.pt')
-    model_weight = YOLO('best_weights_full1.pt')
+    base_dir = Path('models')
+    model = YOLO(base_dir / 'best_label_and_scale_display.pt')
+    model_weight = YOLO(base_dir / 'best_weights_full1.pt')
     class_names = model.names
 
     amks.append("AMKs")
@@ -373,9 +594,10 @@ def analyze_image(dataset_path):
         })
 
     df = pd.DataFrame(results)
-    df.to_csv(f'{dataset_path}/results.csv', index=False)
+    results_path = Path(dataset_path) / 'results.csv'
+    df.to_csv(results_path, index=False)
 
-    return f'{dataset_path}/results.csv'
+    return str(results_path)
 
 
 
