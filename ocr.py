@@ -456,6 +456,7 @@ def analyze_image(dataset_path, raspi_flag=False, test=False):
             base_path = Path(__file__).resolve().parent
 
         dataset_dir = base_path / "dataset"
+        dataset_path = dataset_dir
     else:
         dataset_dir = dataset_path
     #results_dir = "results"
@@ -494,91 +495,94 @@ def analyze_image(dataset_path, raspi_flag=False, test=False):
         results_model = model(original_img)
         weight = "Nan"
         for i, result in enumerate(results_model):
-            boxes = result.boxes
-            for j, box in enumerate(boxes):
-                # Get bounding box
-                xyxy = box.xyxy[0].cpu().numpy().astype(int)
-                x1, y1, x2, y2 = xyxy
+            if result.boxes is not None and len(result.boxes) > 0:
+                boxes = result.boxes
+                for j, box in enumerate(boxes):
+                    # Get bounding box
+                    xyxy = box.xyxy[0].cpu().numpy().astype(int)
+                    x1, y1, x2, y2 = xyxy
 
-                # Get class ID and class name
-                class_id = int(box.cls[0].cpu().numpy())
-                class_name = class_names[class_id]
+                    # Get class ID and class name
+                    class_id = int(box.cls[0].cpu().numpy())
+                    class_name = class_names[class_id]
 
-                # Crop detected region
-                cropped = original_img[y1:y2, x1:x2]
+                    # Crop detected region
+                    cropped = original_img[y1:y2, x1:x2]
 
-                # Save with class in filename
-                filename = f"cropped_{class_name}_{i}_{j}.jpg"
-                # cv2.imwrite(filename, cropped)
-                # print(f"Saved {filename} for class '{class_name}'")
+                    # Save with class in filename
+                    filename = f"cropped_{class_name}_{i}_{j}.jpg"
+                    # cv2.imwrite(filename, cropped)
+                    # print(f"Saved {filename} for class '{class_name}'")
 
-                # cv2.imshow(f"YOLO result for class '{class_name}'", cropped)
-                # cv2.waitKey(0)
-                # cv2.destroyAllWindows()
-                if class_name == 'scale_display':
-                    results_weight = model_weight(cropped)
-                    class_names_weights = model_weight.names  # {0: '1', 1: '2-dot', 2: '3-kg', ...}
+                    # cv2.imshow(f"YOLO result for class '{class_name}'", cropped)
+                    # cv2.waitKey(0)
+                    # cv2.destroyAllWindows()
+                    if class_name == 'scale_display':
+                        results_weight = model_weight(cropped)
+                        class_names_weights = model_weight.names  # {0: '1', 1: '2-dot', 2: '3-kg', ...}
 
-                    best_dot = (" Nan ", 0.0)  # (class_name, confidence)
-                    best_number = (" Nan ", 0.0)
-                    best_kg = (" Nan ", 0.0)
+                        best_dot = (" Nan ", 0.0)  # (class_name, confidence)
+                        best_number = (" Nan ", 0.0)
+                        best_kg = (" Nan ", 0.0)
 
-                    for digit in results_weight:
-                        boxes_weight = digit.boxes
-                        for box_weight in boxes_weight:
-                            class_id = int(box_weight.cls[0].cpu().numpy())
-                            class_name = class_names_weights[class_id]
-                            conf = float(box_weight.conf[0].cpu().numpy())
+                        for digit in results_weight:
+                            boxes_weight = digit.boxes
+                            for box_weight in boxes_weight:
+                                class_id = int(box_weight.cls[0].cpu().numpy())
+                                class_name = class_names_weights[class_id]
+                                conf = float(box_weight.conf[0].cpu().numpy())
 
-                            if "-dot" in class_name:
-                                sub = class_name.replace("-dot", "")
-                                if conf > best_dot[1]:
-                                    best_dot = (sub, conf)
+                                if "-dot" in class_name:
+                                    sub = class_name.replace("-dot", "")
+                                    if conf > best_dot[1]:
+                                        best_dot = (sub, conf)
 
-                            elif "-kg" in class_name:
-                                sub = class_name.replace("-kg", "")
-                                if conf > best_kg[1]:
-                                    best_kg = (sub, conf)
+                                elif "-kg" in class_name:
+                                    sub = class_name.replace("-kg", "")
+                                    if conf > best_kg[1]:
+                                        best_kg = (sub, conf)
 
-                            else:
-                                if conf > best_number[1]:
-                                    best_number = (class_name, conf)
+                                else:
+                                    if conf > best_number[1]:
+                                        best_number = (class_name, conf)
 
-                            print("Found class:", class_name, "with confidence:", conf)
+                                print("Found class:", class_name, "with confidence:", conf)
 
-                    first = best_dot[0]
-                    second = best_number[0]
-                    third = best_kg[0]
+                        first = best_dot[0]
+                        second = best_number[0]
+                        third = best_kg[0]
 
-                    print("Selected:", first, second, third)
-                    if first != " Nan " and second != " Nan " and third != " Nan ":
-                        found_weight = float(first + "." + second + "" + third)
+                        print("Selected:", first, second, third)
+                        if first != " Nan " and second != " Nan " and third != " Nan ":
+                            found_weight = float(first + "." + second + "" + third)
 
-                    if first == " Nan " or second == " Nan " or third == " Nan ":
-                        print('Could not find a valid weight!')
-                        weight = "Nan"
-                    else:
-                        weight = float(f"{first}.{second}{third}")
+                        if first == " Nan " or second == " Nan " or third == " Nan ":
+                            print('Could not find a valid weight!')
+                            weight = "Nan"
+                        else:
+                            weight = float(f"{first}.{second}{third}")
 
 
-                if class_name == 'label':
+                    if class_name == 'label':
 
-                    # Barcode
-                    found_barcode = process_image_barcode(cropped)
-                    if found_barcode:
-                        for data, btype, rect in found_barcode:
-                            print(f"{image_path}: [{btype}] {data}")
-                    else:
-                        print(f"{image_path}: No barcode found.")
+                        # Barcode
+                        found_barcode = process_image_barcode(cropped)
+                        if found_barcode:
+                            for data, btype, rect in found_barcode:
+                                print(f"{image_path}: [{btype}] {data}")
+                        else:
+                            print(f"{image_path}: No barcode found.")
 
-                    amk = None
-                    if not RASPI:
-                        # AMK
-                        reader = initialize_ocr(['en', 'ko'], True)
-                        texts, annotated_image = perform_ocr_with_rotation(reader, cropped)
+                        amk = None
+                        if not RASPI:
+                            # AMK
+                            reader = initialize_ocr(['en', 'ko'], True)
+                            texts, annotated_image = perform_ocr_with_rotation(reader, cropped)
 
-                        if texts is not None and annotated_image is not None:
-                            amk = save_ocr_results(image_path, texts, annotated_image, "results")
+                            if texts is not None and annotated_image is not None:
+                                amk = save_ocr_results(image_path, texts, annotated_image, "results")
+            else:
+                print(f"No object detected in picture'")
 
         barcode_data = "; ".join(
             [f"[{btype}] {data}" for data, btype, rect in found_barcode]) if found_barcode else "None"
@@ -595,6 +599,3 @@ def analyze_image(dataset_path, raspi_flag=False, test=False):
     df.to_csv(results_path, index=False)
 
     return str(results_path)
-
-
-

@@ -93,6 +93,12 @@ class App:
             self.capture_btn.pack_forget()
             self.retake_btn.pack(pady=5)
             self.buttons_frame.pack()
+        elif self.current_frame is None and self.dataset_directory_var.get():
+            raspi = self.raspi_var.get()
+            dataset_directory = self.dataset_directory_var.get()
+            self.result = analyze_image(self.images_directory, raspi, dataset_directory)
+            messagebox.showinfo("Result", f"Analysis: {self.result}")
+            self.images_directory = None
 
     def retake_picture(self):
         self.image = None
