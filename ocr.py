@@ -1,6 +1,7 @@
 import cv2
 import easyocr
 import time
+import sys
 import os
 import re
 from pyzbar import pyzbar
@@ -428,39 +429,35 @@ def process_image_barcode(image):
     return []
 
 
-def analyze_image(dataset_path):
+def analyze_image(dataset_path, raspi_flag=False, test=False):
     """
-    Analyzes images within a specified dataset directory by identifying regions of interest,
-    performing object detection using pre-trained YOLO models, extracting relevant data such
-    as scale weights, barcodes, and AMKs, then saves the results into a CSV file.
+    Analyzes images for specific objects, barcodes, and weights. The function processes all images in a specified dataset
+    directory, performing image recognition through YOLO models, barcode detection, and image-based weight measurement.
+    The outputs are compiled into a CSV file stored in the dataset directory.
 
-    Attributes:
-        roi: tuple of int
-            Region of interest dimensions in the format (x, y, width, height) used for
-            processing the images.
-        scale_roi: tuple of int
-            Specific region of interest for detecting scales in the images.
-        amks: list of str
-            Contains extracted AMK-related information from images.
-        weights: list of str
-            Contains weight information detected from scales in the images.
-        barcodes: list of str
-            Contains barcode data identified during image analysis.
-
-    Parameters:
-        dataset_path: str
-            The path to the directory containing image files to analyze.
+    Args:
+        dataset_path (str): Path to the directory containing the dataset of images.
+        raspi_flag (bool, optional): Flag determining whether the code is running on a Raspberry Pi. Defaults to False.
 
     Returns:
-        str
-            The path to the location of the generated CSV file containing analyzed results.
+        str: Path to the resulting CSV file containing the analysis results for the processed images.
 
     Raises:
-        This function does not explicitly raise errors but depends on external library
-        behavior to handle any exceptions during file I/O, image processing, or object
-        detection tasks.
+        None
     """
-    dataset_dir = dataset_path
+    global RASPI
+    RASPI = raspi_flag
+    if test:
+        if getattr(sys, 'frozen', False):
+            # Running as a bundled executable
+            base_path = Path(sys.executable).resolve().parent
+        else:
+            # Running as a script
+            base_path = Path(__file__).resolve().parent
+
+        dataset_dir = base_path / "dataset"
+    else:
+        dataset_dir = dataset_path
     #results_dir = "results"
     scale_template_path = "scale_display.png"
     image_files = get_image_files_from_directory(dataset_dir)

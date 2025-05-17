@@ -11,7 +11,6 @@ from ocr import analyze_image
 def resource_path(relative_path):
     documents_path = Path.home() / "Documents"
     save_folder = documents_path / "Digital Signal Processing"
-
     return str(save_folder / relative_path)
 
 class App:
@@ -23,10 +22,20 @@ class App:
         self.canvas = tk.Canvas(root, width=400, height=300)
         self.canvas.pack()
 
+        # Checkbox for analysis flag
+        self.raspi_var = tk.BooleanVar()
+        self.raspi_check = tk.Checkbutton(root, text="RaspberryPi", variable=self.raspi_var)
+        self.raspi_check.pack()
+
+        # Checkbox for analysis flag
+        self.dataset_directory_var = tk.BooleanVar()
+        self.dataset_directory_check = tk.Checkbutton(root, text="Dataset Directory instead of Webcam", variable=self.dataset_directory_var)
+        self.dataset_directory_check.pack()
+
+
         # Main buttons
         self.capture_btn = tk.Button(root, text="Take Picture", command=self.capture_image)
         self.retake_btn = tk.Button(root, text="Retake Picture", command=self.retake_picture)
-
         self.capture_btn.pack(pady=5)
         self.retake_btn.pack_forget()
 
@@ -61,7 +70,7 @@ class App:
         self.cap = cv2.VideoCapture(0)
         self.current_frame = None
         self.video_loop_id = None
-        self.previewing = True  # controls preview state
+        self.previewing = True
         self.update_video_feed()
 
     def update_video_feed(self):
@@ -77,11 +86,10 @@ class App:
 
     def capture_image(self):
         if self.current_frame is not None:
-            self.previewing = False  # stop updating video
+            self.previewing = False
             self.image = Image.fromarray(cv2.cvtColor(self.current_frame, cv2.COLOR_BGR2RGB))
             self.original_image = self.image.copy()
             self.show_static_image()
-
             self.capture_btn.pack_forget()
             self.retake_btn.pack(pady=5)
             self.buttons_frame.pack()
@@ -92,12 +100,10 @@ class App:
         self.result = None
         self.crop_mode = False
         self.canvas.delete("all")
-
         self.buttons_frame.pack_forget()
         self.retake_btn.pack_forget()
         self.capture_btn.pack(pady=5)
-
-        self.previewing = True  # resume preview
+        self.previewing = True
 
     def show_static_image(self):
         img_resized = self.image.resize((400, 300))
@@ -212,7 +218,9 @@ class App:
 
     def analyze(self):
         if self.images_directory is not None:
-            self.result = analyze_image(self.images_directory)
+            raspi = self.raspi_var.get()
+            dataset_directory = self.dataset_directory_var.get()
+            self.result = analyze_image(self.images_directory, raspi, dataset_directory)
             messagebox.showinfo("Result", f"Analysis: {self.result}")
             self.images_directory = None
 
